@@ -26,14 +26,13 @@ def flann(d1,d2):
 	return good_matches
 
 def circles(img,cannyimg):
-	circles = cv.HoughCircles(cannyimg,cv.HOUGH_GRADIENT,1,80,param1=50,param2=30,minRadius=100,maxRadius=200)
+	circles = cv.HoughCircles(cannyimg,cv.HOUGH_GRADIENT,1,250,param1=75,param2=40,minRadius=100,maxRadius=200)
 	circles = np.uint16(np.around(circles))
 
 	good_circles=[]
 	good_circles.append(circles[0][0])
 	for circle in circles[0,:]:
 		i=0
-		print(type(circle[0]))
 		for i in range(len(good_circles)):
 			distance = np.sqrt((int(circle[0])-int(good_circles[i][0]))**2 + (int(circle[1])-int(good_circles[i][1]))**2)
 			if (distance < good_circles[i][2]) or (distance < circle[2]):
