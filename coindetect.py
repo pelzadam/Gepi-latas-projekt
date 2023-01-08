@@ -2,6 +2,7 @@
 
 import os
 import argparse as arg
+import datetime as dt
 import numpy as np
 import cv2 as cv
 
@@ -27,11 +28,12 @@ def flann(d1,d2):
 
 	return good_matches
 
-def circles(img,cannyimg,r):
+def circles(img,r):
 	minrad=r
 	maxrad=minrad*2
 	distance=int(minrad*2.5)
-	circles = cv.HoughCircles(cannyimg,cv.HOUGH_GRADIENT,1,distance,param1=75,param2=40,minRadius=minrad,maxRadius=maxrad)
+	circles = cv.HoughCircles(img,cv.HOUGH_GRADIENT,1,distance, \
+						   param1=75,param2=40,minRadius=minrad,maxRadius=maxrad)
 	circles = np.uint16(np.around(circles))
 
 	return circles[0]
@@ -47,30 +49,31 @@ parser.add_argument("minrad",help="Minimum radius of the Hough Circles.", type=i
 parser.add_argument("gauss",help="Kernel size of Gaussian blur.", type=int)
 args=parser.parse_args()
 
-target=args.source
+name=args.source
 radius=args.minrad
 gauss=args.gauss
 
+timestamp = dt.datetime.now()
 forints=('5','10','20','50','100','200')
+images=[]
+matching=[]
 
-output='results/'
+output='results/' + str(timestamp.year) + str(timestamp.month) + str(timestamp.day) + \
+	str(timestamp.hour) + str(timestamp.minute) + str(timestamp.second) + '/'
 cutpath = output + 'cuts/'
 samplepath = output + 'samples/'
 matchpath = output + 'matches/'
-if os.path.exists(output) == False: os.makedirs(output)
-if os.path.exists(cutpath) == False: os.makedirs(cutpath)
-if os.path.exists(samplepath) == False: os.makedirs(samplepath)
-if os.path.exists(matchpath) == False: os.makedirs(matchpath)
-
-log=open(output+'log','w')
-log.write('')
-log.close()
+os.makedirs(output)
+os.makedirs(cutpath)
+os.makedirs(samplepath)
+os.makedirs(matchpath)
 
 log=open(output+'log','a')
-log.write("---Coin detection on {}---\n\n".format(target))
-
-images=[]
-matching=[]
+log.write("--- Coin detection on {} ---\n\
+Date: {}\n\
+Minimum radius: {} \n\
+Gauss kernel size: {}\n\n\
+".format(name,timestamp,radius,gauss))
 
 for i in range(0,len(forints)):
 	j=1
@@ -80,18 +83,12 @@ for i in range(0,len(forints)):
 		j=j+1
 
 
-target = cv.imread(target)
-edge_targ = cv.cvtColor(target, cv.COLOR_BGR2GRAY)
-noblur = cv.Canny(edge_targ, 30, 150, 2)
-cv.imwrite(output+"Gray.jpg",edge_targ)
-cv.imwrite(output+"Noblur.jpg",noblur)
-edge_targ = cv.GaussianBlur(edge_targ, (gauss,gauss), 3) 
-cv.imwrite(output+"Blur.jpg",edge_targ)
-edge_targ = cv.Canny(edge_targ, 30, 150, 2)
-cv.imwrite(output+"Canny.jpg",edge_targ)
+target = cv.imread(name)
+blurred = cv.GaussianBlur(target, (gauss,gauss), 0)
+edge_targ = cv.Canny(blurred, 30, 150, 2)
 edge_targ = cv.dilate(edge_targ, (11,11), iterations = 2)
 
-circles = circles(target.copy(),edge_targ,radius)
+circles = circles(edge_targ,radius)
 print(len(circles)," coins detected.")
 
 cv.imwrite(output+"CannyEdge.jpg", edge_targ)
@@ -112,12 +109,11 @@ for circle in circles:
 	for forint in images:
 		value=0
 		k=0
-		for image in forint:
-			sample = cv.imread(image)
+		for coin in forint:
+			sample = cv.imread(coin)
 			res_sample = cv.resize(sample, (256,int((sample.shape[1]/sample.shape[0])*256)))
-			edge_samp = cv.cvtColor(res_sample, cv.COLOR_BGR2GRAY)
-			edge_samp = cv.GaussianBlur(res_sample, (3,3), 2) 
-			edge_samp = cv.Canny(edge_samp, 30, 150, 2)
+			blur_samp = cv.GaussianBlur(res_sample, (3,3), 2)
+			edge_samp = cv.Canny(blur_samp, 30, 150, 2)
 			edge_samp = cv.dilate(edge_samp, (1,1), iterations = 2)
 			if(i==0):cv.imwrite(samplepath+forints[j]+"."+str(k+1)+". sample.jpg", edge_samp)
 
@@ -126,7 +122,7 @@ for circle in circles:
 
 			value += len(matches)
 
-			log.write("Match with {}: {}\n".format(image,len(matches)))
+			log.write("Match with {}: {}\n".format(coin,len(matches)))
 
 			result=showMatches(target, res_sample,matches,k1,k2,d1,d2)
 			result = cv.resize(result, (1600,900))
@@ -144,13 +140,14 @@ for circle in circles:
 
 	log.write("The value of the coin is: {}\n\n".format(indexof_largest))
 
-	cv.putText(target,indexof_largest,(circle[0],circle[1]),cv.FONT_HERSHEY_SIMPLEX,1,(255, 0, 0, 0),3)
+	cv.putText(target,indexof_largest,(circle[0],circle[1]),cv.FONT_HERSHEY_SIMPLEX,1,(255, 0, 0, 0),2)
 	cv.circle(target,(circle[0],circle[1]),circle[2],(0,255,0),2)
 	print(i+1,". circle done.")
 	i+=1
 
 log.write("\nThe overall value of the coins is: {}\n\n".format(count))
 
+cv.putText(target,"The value of the coins is: {}".format(count),(10,30),cv.FONT_HERSHEY_SIMPLEX,1,(255, 0, 0, 0),2)
 cv.imwrite(output+"endresult.jpg", target)
 
 log.close()
